@@ -26,42 +26,39 @@ class Client
 {
 public:
   explicit
-  Client(ndn::Face& face, const std::string& filename)
+  Client(ndn::Face& face, const std::string& filename, const std::string& functionName)
     : m_face(face)
     , m_baseName(ndn::Name("/my-local-prefix/simple-fetch/file").append(filename))
-    , m_currentSeqNo(0)
+    , m_functionName(ndn::Function(functionName))
+
   {
-    std::cerr << "Base name: " << m_baseName << std::endl;
-    requestNext();
+  //std::cerr << "Base name: " << m_baseName << std::endl;
+    sendInterest();
   }
 
 private:
   void
-  requestNext()
+  sendInterest()
   {
-    ndn::Name nextName = ndn::Name(m_baseName).appendSequenceNumber(m_currentSeqNo);
-    std::cerr << ">> C++ " << nextName << std::endl;
-    m_face.expressInterest(ndn::Interest(nextName).setMustBeFresh(true),
+    ndn::Interest interest(m_baseName);
+    interest.setFunction(m_functionName);
+    std::cerr << "<< sent Interest: " << interest << std::endl;
+    std::cerr << "<< Function: " << interest.getFunction() << std::endl;
+    m_face.expressInterest(interest,
                            std::bind(&Client::onData, this, _2),
                            std::bind(&Client::onNack, this, _1),
                            std::bind(&Client::onTimeout, this, _1));
-    ++m_currentSeqNo;
   }
 
 
   void
   onData(const ndn::Data& data)
   {
-    std::cerr << "<< C++ "
+    std::cerr << "<< Data: "
               << std::string(reinterpret_cast<const char*>(data.getContent().value()),
                                                            data.getContent().value_size())
               << std::endl;
-
-    if (data.getName().get(-1).toSequenceNumber() >= 10) {
       return;
-    }
-
-    requestNext();
   }
 
   void
@@ -75,32 +72,39 @@ private:
   {
     // re-express interest
     std::cerr << "<< C++ timeout for " << interest << std::endl;
-    m_face.expressInterest(ndn::Interest(interest.getName()),
+    /*m_face.expressInterest(ndn::Interest(interest.getName()),
                            std::bind(&Client::onData, this, _2),
                            std::bind(&Client::onNack, this, _1),
-                           std::bind(&Client::onTimeout, this, _1));
+                           std::bind(&Client::onTimeout, this, _1));*/
   }
 
 private:
   ndn::Face& m_face;
   ndn::Name m_baseName;
-  uint64_t m_currentSeqNo;
+  ndn::Function m_functionName;
 };
 
 int
 main(int argc, char** argv)
 {
   if (argc < 2) {
-    std::cerr << "You have to specify filename as an argument" << std::endl;
+    std::cerr << "Specify filename" << std::endl;
     return -1;
   }
+
+  std::string functionName;
+  if(argv[2] == NULL){
+      functionName = "/";
+  }
+
+  functionName = argv[2];
 
   try {
     // create Face instance
     ndn::Face face;
 
     // create client instance
-    Client client(face, argv[1]);
+    Client client(face, argv[1], functionName);
 
     // start processing loop (it will block until everything is fetched)
     face.processEvents();

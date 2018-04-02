@@ -22,3 +22,8 @@ def build (bld):
         features=['cxx', 'cxxprogram'],
         source='server.cpp',
         use='NDN_CXX')
+
+    bld(target='function',
+        features=['cxx', 'cxxprogram'],
+        source='function.cpp',
+        use='NDN_CXX')

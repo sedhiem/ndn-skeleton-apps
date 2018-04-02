@@ -57,7 +57,7 @@ private:
     data->setContent(reinterpret_cast<const uint8_t*>(content.c_str()), content.size());
 
     // set metainfo parameters
-    data->setFreshnessPeriod(ndn::time::seconds(10));
+  //data->setFreshnessPeriod(ndn::time::seconds(10));
 
     // sign data packet
     m_keyChain.sign(*data);

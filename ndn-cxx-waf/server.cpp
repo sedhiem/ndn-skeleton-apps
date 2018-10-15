@@ -54,6 +54,7 @@ private:
     std::ostringstream os;
     os << "C++ LINE #" << (m_counter++) << std::endl;
     std::string content = os.str();
+    std::cout <<"hello.txt: " << content << std::endl;
     data->setContent(reinterpret_cast<const uint8_t*>(content.c_str()), content.size());
 
     // set metainfo parameters

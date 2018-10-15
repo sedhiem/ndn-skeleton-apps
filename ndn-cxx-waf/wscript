@@ -12,6 +12,12 @@ def configure(conf):
     conf.check_cfg(package='libndn-cxx', args=['--cflags', '--libs'],
                    uselib_store='NDN_CXX', global_define=True, mandatory=True)
 
+    conf.check_cfg(package='python-2.7', args=['--cflags', '--libs'],
+                   uselib_store='PYTHON', global_define=True, mandatory=True)
+
+    conf.check_cfg(package='Consumer-Producer-API', args=['--cflags', '--libs'],
+               uselib_store='CONSUMERPRODUCERAPI', global_define=True, mandatory=True)
+
 def build (bld):
     bld(target='client',
         features=['cxx', 'cxxprogram'],
@@ -26,4 +32,14 @@ def build (bld):
     bld(target='function',
         features=['cxx', 'cxxprogram'],
         source='function.cpp',
-        use='NDN_CXX')
+        use='NDN_CXX PYTHON')
+
+    bld(target='consumer',
+        features=['cxx', 'cxxprogram'],
+        source='consumer.cpp',
+        use='NDN_CXX PYTHON CONSUMERPRODUCERAPI')
+
+    bld(target='producer',
+        features=['cxx', 'cxxprogram'],
+        source='producer.cpp',
+        use='NDN_CXX PYTHON CONSUMERPRODUCERAPI')

@@ -24,13 +24,19 @@
 // correct way to include ndn-cxx headers
 // #include <ndn-cxx/face.hpp>
 // #include <ndn-cxx/security/key-chain.hpp>
+#include <Python.h>
+
 #include <ndn-cxx/face.hpp>
 #include <ndn-cxx/interest.hpp>
 #include <ndn-cxx/data.hpp>
 #include <ndn-cxx/security/key-chain.hpp>
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <iostream>
+#include <fstream>
 #include <string>
+
 
 // Enclosing code in ndn simplifies coding (can also use `using namespace ndn`
 
@@ -64,14 +70,14 @@ private:
     interest.removeHeadFunction();
     static const std::string content = "Success";
 
-
+    interest.refreshNonce();
     // Return Data packet to the requester
     m_face.expressInterest(interest,
                            bind(&Func::onData, this,  _1, _2),
                            bind(&Func::onNack, this, _1, _2),
                            bind(&Func::onTimeout, this, _1));
 
-    std::cout << interest.getFunction() << std::endl;
+    //std::cout << interest.getFunction() << std::endl;
 
   }
 
@@ -79,8 +85,32 @@ private:
   onData(const ndn::Interest& interest, const ndn::Data& data)
   {
     std::cout << data << std::endl;
-    //data.prependFunctionTag();
-    m_face.put(data);
+    /*std::string content(reinterpret_cast<const char*>(data.getContent().value()), data.getContent().value_size());
+    auto pos = content.find("0");
+    content.replace(pos, 1, "1");
+    std::cout << "<<New Content: " << content << std::endl;
+    data.setContent2(reinterpret_cast<const uint8_t*>(content.c_str()), content.size());*/
+
+    Py_Initialize();
+    PyObject* PyFileObject = PyFile_FromString("testpython.py", "r");
+    PyRun_SimpleFileEx(PyFile_AsFile(PyFileObject), "testpython.py", 1);
+    Py_Finalize();
+
+    std::ifstream filetext;
+    std::string line;
+    std::string stringtext;
+    filetext.open("testtext.txt");
+    while(std::getline(filetext, line)) {
+      stringtext = stringtext + line;
+    }
+    filetext.close();
+
+    std::cout << stringtext << std::endl;
+    std::shared_ptr<ndn::Data> newdata = std::make_shared<ndn::Data>(interest.getName());
+    newdata->setContent(reinterpret_cast<const uint8_t*>(stringtext.c_str()), stringtext.size());
+
+    m_keyChain.sign(*newdata);
+    m_face.put(*newdata);
   }
 
   void

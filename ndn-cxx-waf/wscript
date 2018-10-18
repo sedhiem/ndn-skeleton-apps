@@ -32,7 +32,7 @@ def build (bld):
     bld(target='function',
         features=['cxx', 'cxxprogram'],
         source='function.cpp',
-        use='NDN_CXX PYTHON')
+        use='NDN_CXX PYTHON CONSUMERPRODUCERAPI')
 
     bld(target='consumer',
         features=['cxx', 'cxxprogram'],

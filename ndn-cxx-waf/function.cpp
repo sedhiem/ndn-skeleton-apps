@@ -24,7 +24,8 @@
 // correct way to include ndn-cxx headers
 // #include <ndn-cxx/face.hpp>
 // #include <ndn-cxx/security/key-chain.hpp>
-#include <Python.h>
+//#include <Python.h>
+#include <Consumer-Producer-API/producer-context.hpp>
 
 #include <ndn-cxx/face.hpp>
 #include <ndn-cxx/interest.hpp>
@@ -35,10 +36,10 @@
 #include <stdlib.h>
 #include <iostream>
 #include <fstream>
+#include <vector>
 #include <string>
+#include <tuple>
 
-
-// Enclosing code in ndn simplifies coding (can also use `using namespace ndn`
 
 class Func
 {
@@ -46,7 +47,7 @@ public:
   void
   run()
   {
-    m_face.setInterestFilter(m_prefix,
+    m_face.setInterestFilter(m_funcName,
                              bind(&Func::onInterest, this, _1, _2),
                              ndn::RegisterPrefixSuccessCallback(),
                              bind(&Func::onRegisterFailed, this, _1, _2));
@@ -55,20 +56,22 @@ public:
   }
 
   void
-  setPrefix(ndn::Name prefix)
+  setFuncName(ndn::Name funcName)
   {
-    m_prefix = prefix;
+    m_funcName = funcName;
+    m_lastReassembledSegment = 0;
+    m_finalBlockNumber = 0;
   }
 
 private:
   void
   onInterest(const ndn::InterestFilter& filter, const ndn::Interest& interest)
   {
-    std::cout << "<< Interest: " << interest << std::endl;
-    std::cout << "Function Success: " << interest.getFunction() << std::endl;
-
+    std::cout << "<< Interest: " << interest.getName() << std::endl;
+    //std::cout << "Function Success: " << interest.getFunction() << std::endl;
+    std::cout << "--------------------------------------------" << std::endl;
     interest.removeHeadFunction();
-    static const std::string content = "Success";
+    //static const std::string content = "Success";
 
     interest.refreshNonce();
     // Return Data packet to the requester
@@ -84,46 +87,128 @@ private:
   void
   onData(const ndn::Interest& interest, const ndn::Data& data)
   {
-    std::cout << data << std::endl;
-    /*std::string content(reinterpret_cast<const char*>(data.getContent().value()), data.getContent().value_size());
-    auto pos = content.find("0");
-    content.replace(pos, 1, "1");
-    std::cout << "<<New Content: " << content << std::endl;
-    data.setContent2(reinterpret_cast<const uint8_t*>(content.c_str()), content.size());*/
-
-    Py_Initialize();
-    PyObject* PyFileObject = PyFile_FromString("testpython.py", "r");
-    PyRun_SimpleFileEx(PyFile_AsFile(PyFileObject), "testpython.py", 1);
-    Py_Finalize();
-
-    std::ifstream filetext;
-    std::string line;
-    std::string stringtext;
-    filetext.open("testtext.txt");
-    while(std::getline(filetext, line)) {
-      stringtext = stringtext + line;
-    }
-    filetext.close();
-
-    std::cout << stringtext << std::endl;
-    std::shared_ptr<ndn::Data> newdata = std::make_shared<ndn::Data>(interest.getName());
-    newdata->setContent(reinterpret_cast<const uint8_t*>(stringtext.c_str()), stringtext.size());
-
-    m_keyChain.sign(*newdata);
-    m_face.put(*newdata);
+    dataCreation(data);
+    //m_face.put(data);
   }
 
+  /***********************************DATA REASSEMBLY*************************************/
+  void
+  dataCreation(const ndn::Data& data)
+  {
+    std::cout << "Interest: " << data.getName() << std::endl;
+    std::cout << "Prefix: " << m_prefix << std::endl;
+    std::cout << "Segment No.: " << data.getName().get(-1).toSegment() << std::endl;
+    std::cout << "Final Block No.: " << m_finalBlockNumber << std::endl;
+
+    if(data.getContentType() == ndn::tlv::ContentType_Blob)
+    {
+      m_receiveBuffer[data.getName().get(-1).toSegment()] = data.shared_from_this();
+      reassembleSegments();
+
+
+      if(data.getName().get(-1).toSegment() == 0)
+      {
+        m_prefix = getPrefix(data.getName());
+        std::cout << "Prefix: " << m_prefix << std::endl;
+        m_finalBlockNumber = data.getFinalBlockId().toSegment();
+        m_face.put(data);
+      }
+
+      if(data.getName().get(-1).toSegment() == m_finalBlockNumber)
+      {
+        createFile();
+
+        /**APP GOES HERE**/
+
+        dataSegmentation(ndn::Name("test.png"));
+      }
+    }
+    std::cout << "-------------------------------------------------------" << std::endl;
+  }
+
+  void
+  reassembleSegments()
+  {
+    auto head = m_receiveBuffer.find(m_lastReassembledSegment);
+    while(head != m_receiveBuffer.end())
+    {
+      addToBuffer(*(head->second));
+      m_receiveBuffer.erase(head);
+      m_lastReassembledSegment++;
+      head = m_receiveBuffer.find(m_lastReassembledSegment);
+    }
+  }
+
+  void
+  addToBuffer(const ndn::Data& data)
+  {
+    const ndn::Block content = data.getContent();
+    m_contentBuffer.insert(m_contentBuffer.end(), &content.value()[0], &content.value()[content.value_size()]);
+    std::cout << "Adding to Buffer" << std::endl;
+
+    return;
+  }
+
+  void
+  createFile()
+  {
+    std::cout << "---------------------------------------------------" << std::endl;
+    std::cout << "Creating File" << std::endl;
+    std::ofstream outfile("test3.png", std::ofstream::binary);
+    outfile.write((char*)m_contentBuffer.data(), m_contentBuffer.size());
+    std::cout << "BufferSize: " << m_contentBuffer.size() << std::endl;
+    outfile.close();
+    std::cout << "Success" << std::endl;
+    m_finalBlockNumber = 0;
+
+    return;
+  }
+
+  /*********************************************************************************/
+
+  /************************DATA SEGMENTATION****************************************/
+  void
+  dataSegmentation(ndn::Name suffix)
+  {
+    const uint8_t* buffer;
+    size_t bufferSize;
+    std::tie(buffer, bufferSize) = loadFile("test3.png");
+
+    ndn::Producer producer(m_prefix);
+    producer.attach();
+    producer.produce(suffix, buffer, bufferSize);
+    sleep(300);
+  }
+
+  std::tuple<const uint8_t*, size_t> loadFile(std::string filename)
+  {
+      std::ifstream infile(filename, std::ifstream::binary);
+      infile.seekg(0, infile.end);
+      size_t bufferSize = infile.tellg();
+      infile.seekg(0);
+
+      char* buffer = new char[bufferSize];
+      infile.read(buffer, bufferSize);
+      infile.close();
+
+      return std::make_tuple((const uint8_t*)buffer, bufferSize);
+  }
+  /*********************************************************************************/
+
+  /************************Callbacks************************************************/
   void
   onNack(const ndn::Interest& interest, const ndn::lp::Nack& nack)
   {
     std::cout << "received Nack with reason " << nack.getReason()
               << " for interest " << interest << std::endl;
+    std::cout << "---------------------------------------------" << std::endl;
   }
 
   void
   onTimeout(const ndn::Interest& interest)
   {
-    std::cout << "Timeout " << interest << std::endl;
+    std::cout << "Timeout Seg No.: " << interest.getName().get(-1).toSegment() << std::endl;
+    std::cout << "---------------------------------------------" << std::endl;
   }
 
   void
@@ -134,11 +219,29 @@ private:
               << std::endl;
     m_face.shutdown();
   }
+/***************************************************************************************/
+
+  ndn::Name
+  getPrefix(ndn::Name name){
+    std::string prefix;
+    for(int i = 0; i < name.size()-2; i++) //Removes Segment and file name
+    {
+      prefix.append("/");
+      prefix.append(name.get(i).toUri());
+    }
+    return ndn::Name(prefix);
+  }
 
 private:
   ndn::Face m_face;
-  ndn::Name m_prefix;
+  ndn::Name m_funcName;
   ndn::KeyChain m_keyChain;
+
+  ndn::Name m_prefix;
+  std::map<uint64_t, std::shared_ptr<const ndn::Data>> m_receiveBuffer;
+  std::vector<uint8_t> m_contentBuffer;
+  uint64_t m_lastReassembledSegment;
+  uint64_t m_finalBlockNumber;
 };
 
 int
@@ -150,7 +253,7 @@ main(int argc, char** argv)
   }
   try {
     Func function;
-    function.setPrefix(ndn::Name(argv[1]));
+    function.setFuncName(ndn::Name(argv[1]));
     function.run();
   }
   catch (const std::exception& e) {

@@ -10,28 +10,55 @@ class CallbackContainer
 public:
   CallbackContainer()
   : m_interestCounter(0)
+  , m_dataCounter(0)
   {}
 
-  void processInterest(Producer& producer, const Interest& interest)
+  void
+  processInfoInterest(Producer& infoProducer, const Interest& interest)
   {
-    m_interestCounter++;
+    Name filename("test.png");
+    const uint8_t* m_buffer;
+    size_t m_bufferSize;
 
-    std::cout << "LOADING PNG" << std::endl;
+    std::tie(m_buffer, m_bufferSize) = loadFile("test.png");
+    int finalBlockId = infoProducer.getFinalBlockIdFromBufferSize(filename, m_bufferSize);
+    std::string str(std::to_string(finalBlockId));
+    std::cout << "No of Seg.: " << str << std::endl;
+    infoProducer.produce(filename, reinterpret_cast<const uint8_t*>(str.c_str()), str.size());
 
-    const uint8_t* buffer;
-    size_t bufferSize;
-    std::tie(buffer, bufferSize) = loadFile("test.png");
+    return;
+  }
 
-    std::cout << "SENDING PNG" << std::endl;
+  void
+  leavingInfoData(Producer& pilotProducer, const Data& data)
+  {
+    std::cout << "Leaving Data: " << data.getName() << std::endl;
+  }
 
-    producer.produce(Name("test.png"), buffer, bufferSize);
-    std::cout << "bufferSize: " << bufferSize << std::endl;
+  void
+  processContentInterest(Producer& contentProducer, const Interest& interest)
+  {
+      const uint8_t* m_buffer;
+      size_t m_bufferSize;
+      std::tie(m_buffer, m_bufferSize) = loadFile("test.png");
+      contentProducer.produce(Name("test.png"), m_buffer, m_bufferSize);
+      std::cout << "bufferSize: " << m_bufferSize << std::endl;
 
-    std::cout << "SENT PNG FILE" << std::endl;
+      std::cout << "SENT PNG FILE" << std::endl;
+
+      return;
+  }
+
+  void
+  leavingContentData(Producer& producer, const Data& data)
+  {
+    //std::cout << "Leaving Data: " << data.getName() << std::endl;
   }
 
 private:
   int m_interestCounter;
+  int m_dataCounter;
+
 
   std::tuple<const uint8_t*, size_t> loadFile(std::string filename)
   {
@@ -50,14 +77,19 @@ private:
 
 int main(int argc, char* argv[])
 {
-    Name producerName("/test/producer");
-
     CallbackContainer callback;
 
-    Producer producer(producerName);
+    Name pilotProducerName("/test/producer/info");
+    Producer pilotProducer(pilotProducerName);
+    pilotProducer.setContextOption(CACHE_MISS, (ProducerInterestCallback)bind(&CallbackContainer::processInfoInterest, &callback, _1, _2));
+    pilotProducer.setContextOption(DATA_LEAVE_CNTX, (ProducerDataCallback)bind(&CallbackContainer::leavingInfoData, &callback, _1, _2));
+    pilotProducer.attach();
 
-    producer.setContextOption(CACHE_MISS, (ProducerInterestCallback)bind(&CallbackContainer::processInterest, &callback, _1, _2));
-    producer.attach();
+    Name contentProducerName("/test/producer/content");
+    Producer contentProducer(contentProducerName);
+    contentProducer.setContextOption(CACHE_MISS, (ProducerInterestCallback)bind(&CallbackContainer::processContentInterest, &callback, _1, _2));
+    contentProducer.setContextOption(DATA_LEAVE_CNTX, (ProducerDataCallback)bind(&CallbackContainer::leavingContentData, &callback, _1, _2));
+    contentProducer.attach();
     sleep(300);
 
     return 0;

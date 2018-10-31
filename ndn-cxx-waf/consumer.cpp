@@ -35,7 +35,7 @@ public:
       int finalBlockId = std::stoi(str);
       std::cout << "finalBlockId: " << finalBlockId << std::endl;
       std::cout << "------------------------------------------------------" << std::endl;
-
+      m_finalBlockId = (uint64_t)finalBlockId;
       return;
   }
 
@@ -60,6 +60,9 @@ public:
 
     return;
   }
+
+  uint64_t m_finalBlockId;
+
 private:
   int m_dataCounter;
 };
@@ -69,7 +72,7 @@ int main(int argc, char* argv[])
   CallbackContainer callback;
 
   Name pilotConsumerName("test/producer/info");
-  Consumer pilotConsumer(pilotConsumerName, RDR);
+  Consumer pilotConsumer(pilotConsumerName, SDR);
   pilotConsumer.setContextOption(MUST_BE_FRESH_S, true);
   pilotConsumer.setContextOption(INTEREST_LIFETIME, 5000);
   pilotConsumer.setContextOption(DATA_ENTER_CNTX, (ConsumerDataCallback)bind(&CallbackContainer::processInfoData, &callback, _1, _2));
@@ -85,6 +88,8 @@ int main(int argc, char* argv[])
   contentConsumer.setContextOption(CONTENT_RETRIEVED, (ConsumerContentCallback)bind(&CallbackContainer::processContentPayload, &callback, _1, _2, _3));
   contentConsumer.setContextOption(INTEREST_LEAVE_CNTX, (ConsumerInterestCallback)bind(&CallbackContainer::leavingContentInterest, &callback, _1, _2));
   contentConsumer.setContextOption(FUNCTION, functionName);
+  contentConsumer.setContextOption(FINAL_BLOCK_ID, callback.m_finalBlockId);
+  std::cout << callback.m_finalBlockId << std::endl;
   contentConsumer.consume("test.png");
 
   return 0;

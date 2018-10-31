@@ -21,7 +21,7 @@ public:
     size_t m_bufferSize;
 
     std::tie(m_buffer, m_bufferSize) = loadFile("test.png");
-    int finalBlockId = infoProducer.getFinalBlockIdFromBufferSize(filename, m_bufferSize);
+    int finalBlockId = infoProducer.getFinalBlockIdFromBufferSize(m_contentPrefix.append(filename), m_bufferSize);
     std::string str(std::to_string(finalBlockId));
     std::cout << "No of Seg.: " << str << std::endl;
     infoProducer.produce(filename, reinterpret_cast<const uint8_t*>(str.c_str()), str.size());
@@ -55,10 +55,11 @@ public:
     //std::cout << "Leaving Data: " << data.getName() << std::endl;
   }
 
+  Name m_contentPrefix;
+
 private:
   int m_interestCounter;
   int m_dataCounter;
-
 
   std::tuple<const uint8_t*, size_t> loadFile(std::string filename)
   {
@@ -86,11 +87,13 @@ int main(int argc, char* argv[])
     pilotProducer.attach();
 
     Name contentProducerName("/test/producer/content");
+    callback.m_contentPrefix = contentProducerName;
     Producer contentProducer(contentProducerName);
+    contentProducer.setContextOption(FUNCTION, Name("/A"));
     contentProducer.setContextOption(CACHE_MISS, (ProducerInterestCallback)bind(&CallbackContainer::processContentInterest, &callback, _1, _2));
     contentProducer.setContextOption(DATA_LEAVE_CNTX, (ProducerDataCallback)bind(&CallbackContainer::leavingContentData, &callback, _1, _2));
     contentProducer.attach();
-    sleep(300);
+    sleep(10);
 
     return 0;
 }

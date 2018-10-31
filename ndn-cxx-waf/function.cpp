@@ -111,7 +111,7 @@ private:
         m_prefix = getPrefix(data.getName());
         std::cout << "Prefix: " << m_prefix << std::endl;
         m_finalBlockNumber = data.getFinalBlockId().toSegment();
-        m_face.put(data);
+        //m_face.put(data);
       }
 
       if(data.getName().get(-1).toSegment() == m_finalBlockNumber)
@@ -172,12 +172,13 @@ private:
   {
     const uint8_t* buffer;
     size_t bufferSize;
-    std::tie(buffer, bufferSize) = loadFile("test3.png");
-
+    std::tie(buffer, bufferSize) = loadFile("test4.png");
+    std::cout << "new bufferSize: " << bufferSize << std::endl;
     ndn::Producer producer(m_prefix);
-    producer.attach();
+    //producer.attach();
     producer.produce(suffix, buffer, bufferSize);
-    sleep(300);
+    std::cout << "SENDING" << std::endl;
+    //sleep(10);
   }
 
   std::tuple<const uint8_t*, size_t> loadFile(std::string filename)

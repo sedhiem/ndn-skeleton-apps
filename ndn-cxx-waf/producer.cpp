@@ -104,7 +104,7 @@ int main(int argc, char* argv[])
     contentProducer.setContextOption(CACHE_MISS, (ProducerInterestCallback)bind(&CallbackContainer::processContentInterest, &callback, _1, _2));
     contentProducer.setContextOption(DATA_LEAVE_CNTX, (ProducerDataCallback)bind(&CallbackContainer::leavingContentData, &callback, _1, _2));
     contentProducer.attach();
-    sleep(10);
+    sleep(300);
 
     return 0;
 }

@@ -23,14 +23,13 @@ public:
   void
   leavingContentInterest(Consumer& contentConsumer, Interest& interest)
   {
-    //std::cout << "Leaving Content: " << interest.getName() << std::endl;
-
+    std::cout << "Leaving Content: " << interest.getName().get(-1).toSegment() << " " << interest.getFunction() << std::endl;
     return;
   }
 
   void
   processInfoData(Consumer& pilotConsumer, const Data& data)
-  {
+  {std::cout << "data: " << data.getName() << std::endl;
       std::string str(reinterpret_cast<const char*>(data.getContent().value()), data.getContent().value_size());
       int finalBlockId = std::stoi(str);
       std::cout << "finalBlockId: " << finalBlockId << std::endl;

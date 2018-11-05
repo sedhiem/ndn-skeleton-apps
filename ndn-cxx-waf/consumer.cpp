@@ -40,6 +40,15 @@ public:
   }
 
   void
+  processContentData(Consumer& pilotConsumer, const Data& data)
+  {
+      std::cout << "------------------Received Data-------------------------" << std::endl;
+      std::cout << "data: " << data.getName() << std::endl;
+      std::cout << "------------------------------------------------------" << std::endl;
+      return;
+  }
+
+  void
   processContentPayload(Consumer& contentConsumer, const uint8_t* buffer, size_t bufferSize)
   {
     std::cout << "Received All Segments" << std::endl;
@@ -86,6 +95,7 @@ int main(int argc, char* argv[])
   contentConsumer.setContextOption(INTEREST_LIFETIME, 10000);
   contentConsumer.setContextOption(MAX_WINDOW_SIZE, 300);
   contentConsumer.setContextOption(CONTENT_RETRIEVED, (ConsumerContentCallback)bind(&CallbackContainer::processContentPayload, &callback, _1, _2, _3));
+  contentConsumer.setContextOption(DATA_ENTER_CNTX, (ConsumerDataCallback)bind(&CallbackContainer::processContentData, &callback, _1, _2));
   contentConsumer.setContextOption(INTEREST_LEAVE_CNTX, (ConsumerInterestCallback)bind(&CallbackContainer::leavingContentInterest, &callback, _1, _2));
   contentConsumer.setContextOption(FUNCTION, functionName);
   contentConsumer.setContextOption(FINAL_BLOCK_ID, callback.m_finalBlockId);

@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <tuple>
+#include <set>
 
 using namespace ndn;
 
@@ -11,6 +12,7 @@ public:
   CallbackContainer()
   : m_interestCounter(0)
   , m_dataCounter(0)
+  , m_finalBlockId(0)
   {}
 
   void
@@ -22,6 +24,8 @@ public:
 
     std::tie(m_buffer, m_bufferSize) = loadFile("test.png");
     int finalBlockId = infoProducer.getFinalBlockIdFromBufferSize(m_contentPrefix.append(filename), m_bufferSize);
+    m_finalBlockId = (uint64_t) finalBlockId;
+
     std::string str(std::to_string(finalBlockId));
     std::cout << "No of Seg.: " << str << std::endl;
     infoProducer.produce(filename, reinterpret_cast<const uint8_t*>(str.c_str()), str.size());
@@ -38,21 +42,26 @@ public:
   void
   processContentInterest(Producer& contentProducer, const Interest& interest)
   {
-      const uint8_t* m_buffer;
-      size_t m_bufferSize;
-      std::tie(m_buffer, m_bufferSize) = loadFile("test.png");
-      contentProducer.produce(Name("test.png"), m_buffer, m_bufferSize);
-      std::cout << "bufferSize: " << m_bufferSize << std::endl;
+      uint64_t segment = interest.getName().get(-1).toSegment();
+      m_segmentBuffer.insert(segment);
 
-      std::cout << "SENT PNG FILE" << std::endl;
+      if(m_segmentBuffer.size() == m_finalBlockId + 1)
+      {
+        const uint8_t* m_buffer;
+        size_t m_bufferSize;
+        std::tie(m_buffer, m_bufferSize) = loadFile("test.png");
+        contentProducer.produce(Name("test.png"), m_buffer, m_bufferSize);
+        std::cout << "bufferSize: " << m_bufferSize << std::endl;
 
+        std::cout << "SENT PNG FILE" << std::endl;
+      }
       return;
   }
 
   void
   leavingContentData(Producer& producer, const Data& data)
   {
-    //std::cout << "Leaving Data: " << data.getName() << std::endl;
+    std::cout << "Leaving Data: " << data.getName().get(-1).toSegment() << std::endl;
   }
 
   Name m_contentPrefix;
@@ -60,6 +69,8 @@ public:
 private:
   int m_interestCounter;
   int m_dataCounter;
+  std::set<uint64_t> m_segmentBuffer;
+  uint64_t m_finalBlockId;
 
   std::tuple<const uint8_t*, size_t> loadFile(std::string filename)
   {
@@ -93,7 +104,7 @@ int main(int argc, char* argv[])
     contentProducer.setContextOption(CACHE_MISS, (ProducerInterestCallback)bind(&CallbackContainer::processContentInterest, &callback, _1, _2));
     contentProducer.setContextOption(DATA_LEAVE_CNTX, (ProducerDataCallback)bind(&CallbackContainer::leavingContentData, &callback, _1, _2));
     contentProducer.attach();
-    sleep(10);
+    sleep(300);
 
     return 0;
 }

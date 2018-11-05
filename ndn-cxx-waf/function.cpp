@@ -47,12 +47,13 @@ public:
   void
   run()
   {
-    m_face.setInterestFilter(m_funcName,
+    m_face = ndn::make_shared<ndn::Face>();
+    m_face->setInterestFilter(m_funcName,
                              bind(&Func::onInterest, this, _1, _2),
                              ndn::RegisterPrefixSuccessCallback(),
                              bind(&Func::onRegisterFailed, this, _1, _2));
 
-    m_face.processEvents();
+    m_face->processEvents();
   }
 
   void
@@ -73,9 +74,9 @@ private:
     interest.removeHeadFunction();
     //static const std::string content = "Success";
 
-    interest.refreshNonce();
+    //interest.refreshNonce();
     // Return Data packet to the requester
-    m_face.expressInterest(interest,
+    m_face->expressInterest(interest,
                            bind(&Func::onData, this,  _1, _2),
                            bind(&Func::onNack, this, _1, _2),
                            bind(&Func::onTimeout, this, _1));
@@ -159,7 +160,7 @@ private:
     std::cout << "BufferSize: " << m_contentBuffer.size() << std::endl;
     outfile.close();
     std::cout << "Success" << std::endl;
-    m_finalBlockNumber = 0;
+    //m_finalBlockNumber = 0;
 
     return;
   }
@@ -172,13 +173,13 @@ private:
   {
     const uint8_t* buffer;
     size_t bufferSize;
-    std::tie(buffer, bufferSize) = loadFile("test4.png");
+    std::tie(buffer, bufferSize) = loadFile("test3.png");
     std::cout << "new bufferSize: " << bufferSize << std::endl;
     ndn::Producer producer(m_prefix);
-    //producer.attach();
+    producer.attach();
     producer.produce(suffix, buffer, bufferSize);
     std::cout << "SENDING" << std::endl;
-    //sleep(10);
+    sleep(300);
   }
 
   std::tuple<const uint8_t*, size_t> loadFile(std::string filename)
@@ -218,7 +219,7 @@ private:
     std::cerr << "ERROR: Failed to register prefix \""
               << prefix << "\" in local hub's daemon (" << reason << ")"
               << std::endl;
-    m_face.shutdown();
+    m_face->shutdown();
   }
 /***************************************************************************************/
 
@@ -234,7 +235,7 @@ private:
   }
 
 private:
-  ndn::Face m_face;
+  ndn::shared_ptr<ndn::Face> m_face;
   ndn::Name m_funcName;
   ndn::KeyChain m_keyChain;
 

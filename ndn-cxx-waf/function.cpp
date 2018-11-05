@@ -74,7 +74,7 @@ private:
     interest.removeHeadFunction();
     //static const std::string content = "Success";
 
-    //interest.refreshNonce();
+    interest.refreshNonce();
     // Return Data packet to the requester
     m_face->expressInterest(interest,
                            bind(&Func::onData, this,  _1, _2),

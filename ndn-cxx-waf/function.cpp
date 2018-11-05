@@ -176,7 +176,7 @@ private:
     std::tie(buffer, bufferSize) = loadFile("test3.png");
     std::cout << "new bufferSize: " << bufferSize << std::endl;
     ndn::Producer producer(m_prefix);
-    producer.attach();
+    //producer.attach();
     producer.produce(suffix, buffer, bufferSize);
     std::cout << "SENDING" << std::endl;
     sleep(300);

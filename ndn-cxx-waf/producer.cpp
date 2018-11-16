@@ -23,7 +23,7 @@ public:
     size_t m_bufferSize;
 
     std::tie(m_buffer, m_bufferSize) = loadFile("test.png");
-    int finalBlockId = infoProducer.getFinalBlockIdFromBufferSize(m_contentPrefix.append(filename), m_bufferSize);
+    int finalBlockId = Producer::getFinalBlockIdFromBufferSize(m_contentPrefix.append(filename), m_bufferSize);
     m_finalBlockId = (uint64_t) finalBlockId;
 
     std::string str(std::to_string(finalBlockId));

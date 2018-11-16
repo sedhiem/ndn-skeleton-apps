@@ -44,6 +44,13 @@
 class Func
 {
 public:
+  Func():
+  m_lastReassembledSegment(0),
+  m_finalBlockNumber(std::numeric_limits<uint64_t>::max()),
+  m_largerFinalBlockNumber(std::numeric_limits<uint64_t>::max()),
+  m_producer("/")
+  {}
+
   void
   run()
   {
@@ -60,27 +67,34 @@ public:
   setFuncName(ndn::Name funcName)
   {
     m_funcName = funcName;
-    m_lastReassembledSegment = 0;
-    m_finalBlockNumber = 0;
   }
 
 private:
   void
   onInterest(const ndn::InterestFilter& filter, const ndn::Interest& interest)
   {
-    std::cout << "<< Interest: " << interest.getName() << std::endl;
+    std::cout << "<< Interest: " << interest.getName().get(-1).toSegment() << std::endl;
     //std::cout << "Function Success: " << interest.getFunction() << std::endl;
     std::cout << "--------------------------------------------" << std::endl;
     interest.removeHeadFunction();
     //static const std::string content = "Success";
 
     interest.refreshNonce();
-    // Return Data packet to the requester
+
+    uint64_t segment = interest.getName().get(-1).toSegment();
+    if(segment > m_finalBlockNumber)
+    {
+      auto head = m_dataBuffer.find(segment);
+      m_producer.produce(*(head->second));
+      std::cout << "Sending Data for Seg.: " << segment << std::endl;
+    }
+    else
+    {
     m_face->expressInterest(interest,
                            bind(&Func::onData, this,  _1, _2),
                            bind(&Func::onNack, this, _1, _2),
                            bind(&Func::onTimeout, this, _1));
-
+    }
     //std::cout << interest.getFunction() << std::endl;
 
   }
@@ -88,45 +102,39 @@ private:
   void
   onData(const ndn::Interest& interest, const ndn::Data& data)
   {
-    dataCreation(data);
-    //m_face.put(data);
-  }
-
-  /***********************************DATA REASSEMBLY*************************************/
-  void
-  dataCreation(const ndn::Data& data)
-  {
     std::cout << "Interest: " << data.getName() << std::endl;
     std::cout << "Prefix: " << m_prefix << std::endl;
     std::cout << "Segment No.: " << data.getName().get(-1).toSegment() << std::endl;
     std::cout << "Final Block No.: " << m_finalBlockNumber << std::endl;
 
-    if(data.getContentType() == ndn::tlv::ContentType_Blob)
+    //Add Segments to Buffer
+    m_receiveBuffer[data.getName().get(-1).toSegment()] = data.shared_from_this();
+    reassembleSegments();
+
+    if(data.getName().get(-1).toSegment() == 0)
     {
-      m_receiveBuffer[data.getName().get(-1).toSegment()] = data.shared_from_this();
-      reassembleSegments();
+      m_prefix = getPrefix(data.getName());
+      m_producer.setContextOption(PREFIX, m_prefix);
+      m_filename = getFilename(data.getName());
+      m_finalBlockNumber = data.getFinalBlockId().toSegment();
+      std::cout << "Prefix: " << m_prefix << std::endl;
+      std::cout << "Filename: " << m_filename << std::endl;
+    }
 
+    if(data.getName().get(-1).toSegment() == m_finalBlockNumber)
+    {
+      std::string outputFilename = "test.png";
+      createFile(outputFilename);
 
-      if(data.getName().get(-1).toSegment() == 0)
-      {
-        m_prefix = getPrefix(data.getName());
-        std::cout << "Prefix: " << m_prefix << std::endl;
-        m_finalBlockNumber = data.getFinalBlockId().toSegment();
-        //m_face.put(data);
-      }
+      /**APP GOES HERE**/
 
-      if(data.getName().get(-1).toSegment() == m_finalBlockNumber)
-      {
-        createFile();
-
-        /**APP GOES HERE**/
-
-        dataSegmentation(ndn::Name("test.png"));
-      }
+      std::string loadFilename = "test2.png";
+      dataSegmentation(m_filename, loadFilename);
     }
     std::cout << "-------------------------------------------------------" << std::endl;
   }
 
+  /***********************************DATA REASSEMBLY*************************************/
   void
   reassembleSegments()
   {
@@ -151,16 +159,15 @@ private:
   }
 
   void
-  createFile()
+  createFile(std::string outputFilename)
   {
     std::cout << "---------------------------------------------------" << std::endl;
     std::cout << "Creating File" << std::endl;
-    std::ofstream outfile("test3.png", std::ofstream::binary);
+    std::ofstream outfile(outputFilename, std::ofstream::binary);
     outfile.write((char*)m_contentBuffer.data(), m_contentBuffer.size());
     std::cout << "BufferSize: " << m_contentBuffer.size() << std::endl;
     outfile.close();
     std::cout << "Success" << std::endl;
-    //m_finalBlockNumber = 0;
 
     return;
   }
@@ -169,20 +176,35 @@ private:
 
   /************************DATA SEGMENTATION****************************************/
   void
-  dataSegmentation(ndn::Name suffix)
+  dataSegmentation(ndn::Name suffix, std::string loadFilename)
   {
     const uint8_t* buffer;
     size_t bufferSize;
-    std::tie(buffer, bufferSize) = loadFile("test3.png");
+    std::tie(buffer, bufferSize) = loadFile(loadFilename);
     std::cout << "new bufferSize: " << bufferSize << std::endl;
-    ndn::Producer producer(m_prefix);
-    producer.attach();
-    producer.produce(suffix, buffer, bufferSize);
+    uint64_t tmp_finalBlockNumber = ndn::Producer::getFinalBlockIdFromBufferSize(m_prefix.append(suffix), bufferSize);
+    m_producer.attach();
+    if(tmp_finalBlockNumber > m_finalBlockNumber)
+    {
+      m_largerFinalBlockNumber = tmp_finalBlockNumber;
+      m_dataBuffer = m_producer.getDataSegmentMap(suffix, buffer, bufferSize);
+      for(uint64_t i = 0; i <= m_finalBlockNumber; i++)
+      {
+        auto head = m_dataBuffer.find(i);
+        m_producer.produce(*(head->second));
+        m_dataBuffer.erase(head);
+      }
+    }
+    else
+    {
+      m_producer.produce(suffix, buffer, bufferSize);
+    }
     std::cout << "SENDING" << std::endl;
-    sleep(300);
+    //sleep(300);
   }
 
-  std::tuple<const uint8_t*, size_t> loadFile(std::string filename)
+  std::tuple<const uint8_t*, size_t>
+  2rcloadFile(std::string filename)
   {
       std::ifstream infile(filename, std::ifstream::binary);
       infile.seekg(0, infile.end);
@@ -234,16 +256,25 @@ private:
     return ndn::Name(prefix);
   }
 
+  ndn::Name
+  getFilename(ndn::Name name){
+    return ndn::Name(name.get(-2).toUri());
+  }
+
 private:
   ndn::shared_ptr<ndn::Face> m_face;
   ndn::Name m_funcName;
   ndn::KeyChain m_keyChain;
 
+  ndn::Producer m_producer;
   ndn::Name m_prefix;
+  ndn::Name m_filename;
   std::map<uint64_t, std::shared_ptr<const ndn::Data>> m_receiveBuffer;
   std::vector<uint8_t> m_contentBuffer;
   uint64_t m_lastReassembledSegment;
   uint64_t m_finalBlockNumber;
+  uint64_t m_largerFinalBlockNumber;
+  std::map<uint64_t, std::shared_ptr<ndn::Data>> m_dataBuffer; //Buffer for when file is larger
 };
 
 int

@@ -37,6 +37,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <set>
 #include <string>
 #include <tuple>
 
@@ -74,19 +75,19 @@ private:
   onInterest(const ndn::InterestFilter& filter, const ndn::Interest& interest)
   {
     std::cout << "<< Interest: " << interest.getName().get(-1).toSegment() << std::endl;
-    //std::cout << "Function Success: " << interest.getFunction() << std::endl;
     std::cout << "--------------------------------------------" << std::endl;
     interest.removeHeadFunction();
-    //static const std::string content = "Success";
-
     interest.refreshNonce();
 
+    //If new file is larger than original send Data for incoming interest
     uint64_t segment = interest.getName().get(-1).toSegment();
+    m_interestSegmentCounter.insert(segment);
     if(segment > m_finalBlockNumber)
     {
       auto head = m_dataBuffer.find(segment);
       m_producer.produce(*(head->second));
       std::cout << "Sending Data for Seg.: " << segment << std::endl;
+      std::cout << "--------------------------------------------" << std::endl;
     }
     else
     {
@@ -102,7 +103,7 @@ private:
   void
   onData(const ndn::Interest& interest, const ndn::Data& data)
   {
-    std::cout << "Interest: " << data.getName() << std::endl;
+    std::cout << "Data: " << data.getName() << std::endl;
     std::cout << "Prefix: " << m_prefix << std::endl;
     std::cout << "Segment No.: " << data.getName().get(-1).toSegment() << std::endl;
     std::cout << "Final Block No.: " << m_finalBlockNumber << std::endl;
@@ -119,17 +120,34 @@ private:
       m_finalBlockNumber = data.getFinalBlockId().toSegment();
       std::cout << "Prefix: " << m_prefix << std::endl;
       std::cout << "Filename: " << m_filename << std::endl;
+
+      if(m_finalBlockNumber > m_interestSegmentCounter.size()-1)
+      {
+        for(uint64_t i = m_interestSegmentCounter.size(); i <= m_finalBlockNumber; i++)
+        {
+          ndn::Name name(m_prefix);
+          name.appendSegment(i);
+          ndn::Interest newInterest(name);
+          newInterest.setFunction(interest.getFunction());
+          newInterest.setInterestLifetime(ndn::time::milliseconds(10000));
+          std::cout << "Sending for Interests: " << name << std::endl;
+          m_face->expressInterest(newInterest,
+                                 bind(&Func::onData, this,  _1, _2),
+                                 bind(&Func::onNack, this, _1, _2),
+                                 bind(&Func::onTimeout, this, _1));
+        }
+      }
     }
 
     if(data.getName().get(-1).toSegment() == m_finalBlockNumber)
     {
-      std::string outputFilename = "test.png";
+      std::string outputFilename = data.getName().get(-2).toUri(); //"test.png"
       createFile(outputFilename);
 
       /**APP GOES HERE**/
 
-      std::string loadFilename = "test2.png";
-      dataSegmentation(m_filename, loadFilename);
+      std::string loadFilename = data.getName().get(-2).toUri(); //"test.png"
+      dataSegmentation(m_filename, "test2.png");
     }
     std::cout << "-------------------------------------------------------" << std::endl;
   }
@@ -165,7 +183,7 @@ private:
     std::cout << "Creating File" << std::endl;
     std::ofstream outfile(outputFilename, std::ofstream::binary);
     outfile.write((char*)m_contentBuffer.data(), m_contentBuffer.size());
-    std::cout << "BufferSize: " << m_contentBuffer.size() << std::endl;
+    std::cout << "Orig. BufferSize: " << m_contentBuffer.size() << std::endl;
     outfile.close();
     std::cout << "Success" << std::endl;
 
@@ -183,6 +201,7 @@ private:
     std::tie(buffer, bufferSize) = loadFile(loadFilename);
     std::cout << "new bufferSize: " << bufferSize << std::endl;
     uint64_t tmp_finalBlockNumber = ndn::Producer::getFinalBlockIdFromBufferSize(m_prefix.append(suffix), bufferSize);
+    std::cout << "Final Block ID: " << tmp_finalBlockNumber << std::endl;
     m_producer.attach();
     if(tmp_finalBlockNumber > m_finalBlockNumber)
     {
@@ -204,7 +223,7 @@ private:
   }
 
   std::tuple<const uint8_t*, size_t>
-  2rcloadFile(std::string filename)
+  loadFile(std::string filename)
   {
       std::ifstream infile(filename, std::ifstream::binary);
       infile.seekg(0, infile.end);
@@ -271,10 +290,12 @@ private:
   ndn::Name m_filename;
   std::map<uint64_t, std::shared_ptr<const ndn::Data>> m_receiveBuffer;
   std::vector<uint8_t> m_contentBuffer;
+  std::set<uint64_t> m_interestSegmentCounter;
   uint64_t m_lastReassembledSegment;
   uint64_t m_finalBlockNumber;
   uint64_t m_largerFinalBlockNumber;
   std::map<uint64_t, std::shared_ptr<ndn::Data>> m_dataBuffer; //Buffer for when file is larger
+
 };
 
 int

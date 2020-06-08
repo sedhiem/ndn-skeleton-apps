@@ -18,17 +18,20 @@ public:
   void
   processInfoInterest(Producer& infoProducer, const Interest& interest)
   {
-    Name filename("test.png");
+    //Name filename("test.png");
     const uint8_t* m_buffer;
     size_t m_bufferSize;
 
-    std::tie(m_buffer, m_bufferSize) = loadFile("test.png");
-    int finalBlockId = Producer::getFinalBlockIdFromBufferSize(m_contentPrefix.append(filename), m_bufferSize);
+    std::string filenameString = interest.getName().get(-1).toUri(); // get Filename
+    Name fileName(filenameString);
+    std::tie(m_buffer, m_bufferSize) = loadFile(filenameString);
+    int finalBlockId = Producer::getFinalBlockIdFromBufferSize(m_contentPrefix.append(fileName), m_bufferSize);
+    std::cout << finalBlockId << std::endl;
     m_finalBlockId = (uint64_t) finalBlockId;
 
     std::string str(std::to_string(finalBlockId));
-    std::cout << "No of Seg.: " << str << std::endl;
-    infoProducer.produce(filename, reinterpret_cast<const uint8_t*>(str.c_str()), str.size());
+    //std::cout << "No of Seg.: " << str << std::endl;
+    infoProducer.produce(fileName, reinterpret_cast<const uint8_t*>(str.c_str()), str.size());
 
     return;
   }
@@ -42,6 +45,9 @@ public:
   void
   processContentInterest(Producer& contentProducer, const Interest& interest)
   {
+      std::string filenameString = interest.getName().get(-2).toUri(); //get FileName
+      Name fileName(filenameString);
+
       uint64_t segment = interest.getName().get(-1).toSegment();
       m_segmentBuffer.insert(segment);
 
@@ -49,10 +55,10 @@ public:
       {
         const uint8_t* m_buffer;
         size_t m_bufferSize;
-        std::tie(m_buffer, m_bufferSize) = loadFile("test.png");
-        contentProducer.produce(Name("test.png"), m_buffer, m_bufferSize);
+        std::tie(m_buffer, m_bufferSize) = loadFile(filenameString);
+        contentProducer.produce(fileName, m_buffer, m_bufferSize);
         std::cout << "bufferSize: " << m_bufferSize << std::endl;
-
+        //std::cout << "Final Block ID: " << Producer::getFinalBlockIdFromBufferSize(m_contentPrefix.append(Name("test.png")), m_bufferSize) << std::endl;
         std::cout << "SENT PNG FILE" << std::endl;
       }
       return;
@@ -61,7 +67,7 @@ public:
   void
   leavingContentData(Producer& producer, const Data& data)
   {
-    std::cout << "Leaving Data: " << data.getName().get(-1).toSegment() << std::endl;
+    std::cout << "Leaving Data: " << data.getName() << std::endl;
   }
 
   Name m_contentPrefix;
@@ -72,7 +78,8 @@ private:
   std::set<uint64_t> m_segmentBuffer;
   uint64_t m_finalBlockId;
 
-  std::tuple<const uint8_t*, size_t> loadFile(std::string filename)
+  std::tuple<const uint8_t*, size_t>
+  loadFile(std::string filename)
   {
       std::ifstream infile(filename, std::ifstream::binary);
       infile.seekg(0, infile.end);

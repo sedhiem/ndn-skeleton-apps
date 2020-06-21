@@ -200,8 +200,9 @@ private:
     size_t bufferSize;
     std::tie(buffer, bufferSize) = loadFile(loadFilename);
     std::cout << "new bufferSize: " << bufferSize << std::endl;
-    uint64_t tmp_finalBlockNumber = ndn::Producer::getFinalBlockIdFromBufferSize(m_prefix.append(suffix), bufferSize);
+    uint64_t tmp_finalBlockNumber = ndn::Producer::getFinalBlockIdFromBufferSize(m_prefix.append(suffix), m_funcName, bufferSize);
     std::cout << "Final Block ID: " << tmp_finalBlockNumber << std::endl;
+    m_producer.setContextOption(FUNCTION, m_funcName);
     m_producer.attach();
     if(tmp_finalBlockNumber > m_finalBlockNumber)
     {

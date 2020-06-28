@@ -25,7 +25,7 @@ public:
     std::string filenameString = interest.getName().get(-1).toUri(); // get Filename
     Name fileName(filenameString);
     std::tie(m_buffer, m_bufferSize) = loadFile(filenameString);
-    int finalBlockId = Producer::getFinalBlockIdFromBufferSize(m_contentPrefix.append(fileName), m_bufferSize);
+    int finalBlockId = Producer::getFinalBlockIdFromBufferSize(m_contentPrefix.append(fileName), Name("/"), m_bufferSize);
     std::cout << finalBlockId << std::endl;
     m_finalBlockId = (uint64_t) finalBlockId;
 
@@ -58,7 +58,7 @@ public:
         std::tie(m_buffer, m_bufferSize) = loadFile(filenameString);
         contentProducer.produce(fileName, m_buffer, m_bufferSize);
         std::cout << "bufferSize: " << m_bufferSize << std::endl;
-        //std::cout << "Final Block ID: " << Producer::getFinalBlockIdFromBufferSize(m_contentPrefix.append(Name("test.png")), m_bufferSize) << std::endl;
+        //std::cout << "Final Block ID: " << Producer::getFinalBlockIdFromBufferSize(m_contentPrefix.append(Name("test.png")), Name("/"), m_bufferSize) << std::endl;
         std::cout << "SENT PNG FILE" << std::endl;
       }
       return;

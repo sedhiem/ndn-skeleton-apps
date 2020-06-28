@@ -108,6 +108,8 @@ private:
     std::cout << "Segment No.: " << data.getName().get(-1).toSegment() << std::endl;
     std::cout << "Final Block No.: " << m_finalBlockNumber << std::endl;
 
+    ndn::Function executedFunction(data.getFunction());
+
     //Add Segments to Buffer
     m_receiveBuffer[data.getName().get(-1).toSegment()] = data.shared_from_this();
     reassembleSegments();
@@ -147,7 +149,7 @@ private:
       /**APP GOES HERE**/
 
       std::string loadFilename = data.getName().get(-2).toUri(); //"test.png"
-      dataSegmentation(m_filename, "test2.png");
+      dataSegmentation(m_filename, "test2.png", executedFunction);
     }
     std::cout << "-------------------------------------------------------" << std::endl;
   }
@@ -194,19 +196,20 @@ private:
 
   /************************DATA SEGMENTATION****************************************/
   void
-  dataSegmentation(ndn::Name suffix, std::string loadFilename)
+  dataSegmentation(ndn::Name suffix, std::string loadFilename, ndn::Function executedfunction)
   {
     const uint8_t* buffer;
     size_t bufferSize;
     std::tie(buffer, bufferSize) = loadFile(loadFilename);
     std::cout << "new bufferSize: " << bufferSize << std::endl;
-    uint64_t tmp_finalBlockNumber = ndn::Producer::getFinalBlockIdFromBufferSize(m_prefix.append(suffix), bufferSize);
+    uint64_t tmp_finalBlockNumber = ndn::Producer::getFinalBlockIdFromBufferSize(m_prefix.append(suffix), m_funcName, bufferSize);
     std::cout << "Final Block ID: " << tmp_finalBlockNumber << std::endl;
+    m_producer.setContextOption(FUNCTION, m_funcName);
     m_producer.attach();
     if(tmp_finalBlockNumber > m_finalBlockNumber)
     {
       m_largerFinalBlockNumber = tmp_finalBlockNumber;
-      m_dataBuffer = m_producer.getDataSegmentMap(suffix, buffer, bufferSize);
+      m_dataBuffer = m_producer.getDataSegmentMap(suffix, buffer, bufferSize, executedfunction);
       for(uint64_t i = 0; i <= m_finalBlockNumber; i++)
       {
         auto head = m_dataBuffer.find(i);
@@ -216,7 +219,7 @@ private:
     }
     else
     {
-      m_producer.produce(suffix, buffer, bufferSize);
+      m_producer.produce(suffix, executedfunction, buffer, bufferSize);
     }
     std::cout << "SENDING" << std::endl;
     //sleep(300);

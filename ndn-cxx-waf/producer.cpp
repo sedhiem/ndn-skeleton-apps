@@ -85,12 +85,9 @@ private:
       infile.seekg(0, infile.end);
       size_t bufferSize = infile.tellg();
       infile.seekg(0);
-
-      char* buffer = new char[bufferSize];
-      infile.read(buffer, bufferSize);
       infile.close();
 
-      return std::make_tuple((const uint8_t*)buffer, bufferSize);
+      //return std::make_tuple((const uint8_t*)buffer, bufferSize);
   }
 };
 

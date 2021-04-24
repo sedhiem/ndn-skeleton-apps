@@ -40,6 +40,7 @@
 #include <set>
 #include <string>
 #include <tuple>
+#include <unistd.h>
 
 
 class Func
@@ -82,12 +83,23 @@ private:
     //If new file is larger than original send Data for incoming interest
     uint64_t segment = interest.getName().get(-1).toSegment();
     m_interestSegmentCounter.insert(segment);
-    if(segment > m_finalBlockNumber)
+    if(segment > 0)
     {
       auto head = m_dataBuffer.find(segment);
       m_producer.produce(*(head->second));
       std::cout << "Sending Data for Seg.: " << segment << std::endl;
       std::cout << "--------------------------------------------" << std::endl;
+      if(segment == m_largerFinalBlockNumber)
+      {
+        sleep(1);
+        m_producer.FaceReset();
+        m_lastReassembledSegment = 0;
+        while(m_contentBuffer.size() != 0){
+          //auto head = m_contentBuffer.find(0);
+          m_contentBuffer.erase(m_contentBuffer.begin());
+          //std::cout << "m_contentBuffer.size() is " << m_contentBuffer.size() << std::endl;
+        }
+      }
     }
     else
     {
@@ -108,8 +120,6 @@ private:
     std::cout << "Segment No.: " << data.getName().get(-1).toSegment() << std::endl;
     std::cout << "Final Block No.: " << m_finalBlockNumber << std::endl;
 
-    ndn::Function executedFunction(data.getFunction());
-
     //Add Segments to Buffer
     m_receiveBuffer[data.getName().get(-1).toSegment()] = data.shared_from_this();
     reassembleSegments();
@@ -123,14 +133,16 @@ private:
       std::cout << "Prefix: " << m_prefix << std::endl;
       std::cout << "Filename: " << m_filename << std::endl;
 
-      if(m_finalBlockNumber > m_interestSegmentCounter.size()-1)
+      if(m_finalBlockNumber > 0)
       {
-        for(uint64_t i = m_interestSegmentCounter.size(); i <= m_finalBlockNumber; i++)
+        for(uint64_t i = 1; i <= m_finalBlockNumber; i++)
         {
           ndn::Name name(m_prefix);
+          name.append(m_filename);
           name.appendSegment(i);
           ndn::Interest newInterest(name);
           newInterest.setFunction(interest.getFunction());
+          newInterest.setEraseCache(0);
           newInterest.setInterestLifetime(ndn::time::milliseconds(10000));
           std::cout << "Sending for Interests: " << name << std::endl;
           m_face->expressInterest(newInterest,
@@ -142,15 +154,25 @@ private:
     }
 
     if(data.getName().get(-1).toSegment() == m_finalBlockNumber)
-    {
-      std::string outputFilename = data.getName().get(-2).toUri(); //"test.png"
-      createFile(outputFilename);
-
-      /**APP GOES HERE**/
-
-      std::string loadFilename = data.getName().get(-2).toUri(); //"test.png"
-      dataSegmentation(m_filename, "test2.png", executedFunction);
-    }
+      {
+        ndn::Function executedFunction(data.getFunction());
+        
+        std::string outputFilename = data.getName().get(-2).toUri(); //"test.png"
+        createFile(outputFilename);
+        
+        std::cout << outputFilename;
+        
+        std::string s = "sudo python3 clientyolo.py " + outputFilename;
+        
+        system(s.c_str());
+        
+        
+        /**APP GOES HERE**/
+        
+        std::string loadFilename = data.getName().get(-2).toUri(); //"test.png"
+        dataSegmentation(m_filename, outputFilename, executedFunction);
+        //system("sudo rm person.txt");
+      }
     std::cout << "-------------------------------------------------------" << std::endl;
   }
 
@@ -206,16 +228,15 @@ private:
     std::cout << "Final Block ID: " << tmp_finalBlockNumber << std::endl;
     m_producer.setContextOption(FUNCTION, m_funcName);
     m_producer.attach();
-    if(tmp_finalBlockNumber > m_finalBlockNumber)
+    if(tmp_finalBlockNumber > 0)
     {
       m_largerFinalBlockNumber = tmp_finalBlockNumber;
       m_dataBuffer = m_producer.getDataSegmentMap(suffix, buffer, bufferSize, executedfunction);
-      for(uint64_t i = 0; i <= m_finalBlockNumber; i++)
-      {
-        auto head = m_dataBuffer.find(i);
-        m_producer.produce(*(head->second));
-        m_dataBuffer.erase(head);
-      }
+      
+      auto head = m_dataBuffer.find(0);
+      m_producer.produce(*(head->second));
+      m_dataBuffer.erase(head);
+
     }
     else
     {

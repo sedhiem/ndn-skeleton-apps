@@ -62,9 +62,9 @@ public:
   void
   createFilefromBuffer(const uint8_t* buffer, size_t bufferSize)
   {
-    std::ofstream outfile("test.jpg", std::ofstream::binary);
-    outfile.write((const cha*)buffer, bufferSize);
-    outfile.close();2
+    std::ofstream outfile("savedtest.jpg", std::ofstream::binary);
+    outfile.write((const char*)buffer, bufferSize);
+    outfile.close();
 
     return;
   }

@@ -15,9 +15,9 @@
  * limitations under the License.
  */
 
+#include <ndn-cxx/data.hpp>
 #include <ndn-cxx/face.hpp>
 #include <ndn-cxx/interest.hpp>
-#include <ndn-cxx/data.hpp>
 #include <ndn-cxx/security/key-chain.hpp>
 
 #include <iostream>
@@ -26,39 +26,38 @@
 class Server
 {
 public:
-  Server(ndn::Face& face)
+  Server(ndn::Face &face)
     : m_face(face)
     , m_baseName("/my-local-prefix/simple-fetch/file")
     , m_counter(0)
   {
-    m_face.setInterestFilter(m_baseName,
-                             std::bind(&Server::onInterest, this, _2),
-                             std::bind([] {
-                                 std::cerr << "Prefix registered" << std::endl;
-                               }),
-                             [] (const ndn::Name& prefix, const std::string& reason) {
-                               std::cerr << "Failed to register prefix: " << reason << std::endl;
-                             });
+    m_face.setInterestFilter(
+      m_baseName, std::bind(&Server::onInterest, this, _2),
+      std::bind([] { std::cerr << "Prefix registered" << std::endl; }),
+      [](const ndn::Name &prefix, const std::string &reason) {
+        std::cerr << "Failed to register prefix: " << reason << std::endl;
+      });
   }
 
 private:
-  void
-  onInterest(const ndn::Interest& interest)
+  void onInterest(const ndn::Interest &interest)
   {
     std::cerr << "<< interest for " << interest << std::endl;
 
     // create data packet with the same name as interest
-    std::shared_ptr<ndn::Data> data = std::make_shared<ndn::Data>(interest.getName());
+    std::shared_ptr<ndn::Data> data =
+      std::make_shared<ndn::Data>(interest.getName());
 
     // prepare and assign content of the data packet
     std::ostringstream os;
     os << "C++ LINE #" << (m_counter++) << std::endl;
     std::string content = os.str();
-    std::cout <<"hello.txt: " << content << std::endl;
-    data->setContent(reinterpret_cast<const uint8_t*>(content.c_str()), content.size());
+    std::cout << "hello.txt: " << content << std::endl;
+    data->setContent(reinterpret_cast<const uint8_t *>(content.c_str()),
+                     content.size());
 
     // set metainfo parameters
-  //data->setFreshnessPeriod(ndn::time::seconds(10));
+    // data->setFreshnessPeriod(ndn::time::seconds(10));
 
     // sign data packet
     m_keyChain.sign(*data);
@@ -68,16 +67,16 @@ private:
   }
 
 private:
-  ndn::Face& m_face;
+  ndn::Face &m_face;
   ndn::KeyChain m_keyChain;
   ndn::Name m_baseName;
   uint64_t m_counter;
 };
 
-int
-main(int argc, char** argv)
+int main(int argc, char **argv)
 {
-  try {
+  try
+  {
     // create Face instance
     ndn::Face face;
 
@@ -87,7 +86,8 @@ main(int argc, char** argv)
     // start processing loop (it will block forever)
     face.processEvents();
   }
-  catch (const std::exception& e) {
+  catch (const std::exception &e)
+  {
     std::cerr << "ERROR: " << e.what() << std::endl;
   }
   return 0;

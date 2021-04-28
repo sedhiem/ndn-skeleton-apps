@@ -29,22 +29,23 @@ public:
 
   void
   processInfoData(Consumer& pilotConsumer, const Data& data)
-  {std::cout << "data: " << data.getName() << std::endl;
-      std::string str(reinterpret_cast<const char*>(data.getContent().value()), data.getContent().value_size());
-      int finalBlockId = std::stoi(str);
-      std::cout << "finalBlockId: " << finalBlockId << std::endl;
-      std::cout << "------------------------------------------------------" << std::endl;
-      m_finalBlockId = (uint64_t)finalBlockId;
-      return;
+  {
+    std::cout << "data: " << data.getName() << std::endl;
+    std::string str(reinterpret_cast<const char*>(data.getContent().value()), data.getContent().value_size());
+    int finalBlockId = std::stoi(str);
+    std::cout << "finalBlockId: " << finalBlockId << std::endl;
+    std::cout << "------------------------------------------------------" << std::endl;
+    m_finalBlockId = (uint64_t)finalBlockId;
+    return;
   }
 
   void
   processContentData(Consumer& pilotConsumer, const Data& data)
   {
-      std::cout << "------------------Received Data-------------------------" << std::endl;
-      std::cout << "data: " << data.getName() << std::endl;
-      std::cout << "------------------------------------------------------" << std::endl;
-      return;
+    std::cout << "------------------Received Data-------------------------" << std::endl;
+    std::cout << "data: " << data.getName() << std::endl;
+    std::cout << "------------------------------------------------------" << std::endl;
+    return;
   }
 
   void
